@@ -9,7 +9,7 @@ uniform vec3 cameraPosition;
 
 uniform sampler2D texUnit;
 uniform mat4 time;
-uniform int textureRepeats;
+uniform float textureRepeats;
 uniform bool isShaded;
 
 uniform vec3 lightSourcesDirPosArr[4];
