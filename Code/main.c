@@ -14,6 +14,8 @@
 #include "LittleOBJLoader.h"
 
 #include <string.h>
+#include <limits.h>
+#include <stdlib.h>
 
 
 
@@ -47,8 +49,8 @@ void OnTimer(int value)
 GLfloat x_diff = 0;
 GLfloat y_diff = 0;
 
-vec3 p_vector = {2*sin(-M_PI/4 + M_PI/2),2,2*sin(-M_PI/4)};
-vec3 l_vector = {2*sin(-M_PI/4 + M_PI/2)+1,2+0,2*sin(-M_PI/4)+0};
+vec3 p_vector = {-1,23,0};
+vec3 l_vector = {0,0,0};
 vec3 v_vector = {0,1,0};
 mat4 cameraMatrix;
 
@@ -137,7 +139,7 @@ void mouseDrag(int x, int y)
     // camera position
     x_diff += -(x - prev_1_click.x)/100;
     y_diff += -(y - prev_1_click.y)/100;
-    y_diff = min(max(y_diff, -0.95), 0.95);
+    y_diff = min(max(y_diff, -0.99), 0.99);
     prev_2_click.x = prev_1_click.x;
     prev_2_click.y = prev_1_click.y;
     prev_1_click.x = x;
@@ -186,6 +188,33 @@ void mouseClick(int button, int state, int x, int y)
     }
 }
 
+void readArrayFromFile(int layout[10][10], char filepath[])
+{
+    int rows = 10;
+    int cols = 10;
+    int row=0;
+    int col=0;
+    char file_path[PATH_MAX];
+    char *r_file = realpath("Data/Levels/Level_1/layout.txt", file_path);
+    int c;
+    FILE *file;
+    file = fopen(file_path, "r");
+    if (file) {
+        while ((c = getc(file)) != EOF)
+        {
+            if (c != '\n' && c != ' ') {
+                layout[row][col] = (int)c-(int)'0';
+                row++;
+            }
+            if(c == '\n' && row > 0){
+                col++;
+                row=0;
+            }
+        }
+        fclose(file);
+    }
+}
+
 Model *groundModel;
 
 struct model_data
@@ -199,9 +228,27 @@ struct model_data
     int specularExponent;
 };
 
-struct model_data skybox, ground, walls, roof, balcony, blade[4];
-struct model_data bunny, teapot, pebble, klingon, cow;
+struct model_data skybox, ground, walls[2];
 
+struct model_data init_model_data(struct model_data model, char rel_model_path[],
+                     char rel_tex_path[], mat4 importMatrix,
+                     mat4 transformationMatrix, int textureScale,
+                     _Bool isShaded,int specularExponent)
+{
+    char abs_model_path[PATH_MAX];
+    char *r_model = realpath(rel_model_path, abs_model_path);
+    char abs_tex_path[PATH_MAX];
+    char *r_tex = realpath(rel_tex_path, abs_tex_path);
+    model.model = LoadModel(abs_model_path);
+    LoadTGATextureSimple(abs_tex_path, &textureId);
+    model.textureId = textureId++;
+    model.textureScale = textureScale;
+    model.transformationMatrix = transformationMatrix;
+    model.importMatrix = importMatrix;
+    model.isShaded = isShaded;
+    model.specularExponent = specularExponent;
+    return model;
+}
 
 void load_model_data(struct model_data model)
 {
@@ -225,7 +272,11 @@ void init(void)
     printError("GL inits");
 
     // Load and compile shader
-    program = loadShaders("Shaders/main.vert", "Shaders/main.frag");
+    char main_vert_path[PATH_MAX];
+    char *r_vert = realpath("Code/Shaders/main.vert", main_vert_path);
+    char main_frag_path[PATH_MAX];
+    char *r_frag = realpath("Code/Shaders/main.frag", main_frag_path);
+    program = loadShaders(main_vert_path, main_frag_path);
     printError("init shader");
 
     direction_up = SetVector(0.0f,1.0f,0.0f);
@@ -239,10 +290,15 @@ void init(void)
     glUniformMatrix4fv(glGetUniformLocation(program, "cameraMatrix"), 1, GL_TRUE, cameraMatrix.m);
     glUniform3fv(glGetUniformLocation(program, "cameraPosition"), 1, &p_vector);
 
-    mouseDrag(prev_1_click.x, prev_1_click.y);
+    //mouseDrag(prev_1_click.x, prev_1_click.y);
 
     mat4 import_rot, import_trans, import_scale, importMatrix;
     mat4 rot, trans, scale, transformationMatrix;
+    char model_path[PATH_MAX];
+    char tex_path[PATH_MAX];
+    int texScale;
+    _Bool isShaded;
+    int specExp;
 
     trans = T(0.0f, 0.0f, 0.0f);
     rot = Rx(0.0f);
@@ -254,14 +310,49 @@ void init(void)
     import_rot = Rx(0);
     import_scale = S(10.0f, 10.0f, 10.0f);
     importMatrix = Mult(import_trans,Mult(import_rot, import_scale));
+    strcpy(model_path, "Data/Models/Plane/plane.obj");
+    strcpy(tex_path, "Data/Textures/maskros512.tga");
+    texScale = 50;
+    isShaded = 1;
+    specExp = specularExponent[0];
+    
+    ground = init_model_data(ground,model_path,tex_path,importMatrix,
+                    transformationMatrix,texScale,isShaded,specExp);
+    
+    // wall models
+    strcpy(model_path, "Data/Models/Wall/wall.obj");
+    strcpy(tex_path, "Data/Textures/maskros512.tga");
+    texScale = 50;
+    isShaded = 1;
+    specExp = specularExponent[0];
+    
+    
+    
+    int rows = 10;
+    int cols = 10;
+    int layout[rows][cols];
+    readArrayFromFile(layout, "Data/Levels/Level_1/layout.txt");
+    int wall_index = 0;
+    for (int row = 0; row < rows; ++row)
+    {
+        for (int col = 0; col < cols; ++col)
+        {
+            printf("boop\n");
+            printf("row: %d, col: %d\n", row, col);
+            if (layout[row][col] == 1)
+            {
+                import_trans = T(col, 0, row);
+                import_rot = Ry((0*0.25f)*M_PI*2);
+                import_scale = S(1.0f, 1.0f, 1.0f);
+                importMatrix = Mult(import_trans,Mult(import_rot, import_scale));
 
-    ground.model = LoadModel("../Data/Models/plane.obj");
-    ground.textureId = textureId++;
-    ground.textureScale = 15;
-    ground.transformationMatrix = transformationMatrix;
-    ground.importMatrix = importMatrix;
-    ground.isShaded = 1;
-    ground.specularExponent = specularExponent[0];
+                walls[wall_index] = init_model_data(walls[wall_index],model_path,tex_path,importMatrix,
+                transformationMatrix,texScale,isShaded,specExp);
+                
+                wall_index++;
+            }
+        }
+    }
 
     printError("init arrays");
 }
@@ -294,6 +385,11 @@ void display(void)
     // ground model
     load_model_data(ground);
     DrawModel(ground.model, program, "in_Position", "in_Normal", "in_TexCoord");
+    // wall models
+    load_model_data(walls[0]);
+    DrawModel(walls[0].model, program, "in_Position", "in_Normal", "in_TexCoord");
+    load_model_data(walls[1]);
+    DrawModel(walls[1].model, program, "in_Position", "in_Normal", "in_TexCoord");
 
     keyPress();
 
