@@ -23,7 +23,7 @@
 // Reference to shader program
 GLuint program;
 
-GLuint textureId;
+GLuint textureId = 1;
 
 #define near 1.0
 #define far 30.0
@@ -45,11 +45,15 @@ void OnTimer(int value)
     glutTimerFunc(20, &OnTimer, value);
 }
 
+// map dimensions
+#define dim_x 10
+#define dim_y 10
+
 // initial camera matrix
 GLfloat x_diff = 0;
 GLfloat y_diff = 0;
 
-vec3 p_vector = {-1,23,0};
+vec3 p_vector = {0,23,1};
 vec3 l_vector = {0,0,0};
 vec3 v_vector = {0,1,0};
 mat4 cameraMatrix;
@@ -188,10 +192,10 @@ void mouseClick(int button, int state, int x, int y)
     }
 }
 
-void readArrayFromFile(int layout[10][10], char filepath[])
+void readLevelFromFile(int layout[dim_y][dim_x], char filepath[])
 {
-    int rows = 10;
-    int cols = 10;
+    int rows = dim_y;
+    int cols = dim_x;
     int row=0;
     int col=0;
     char file_path[PATH_MAX];
@@ -202,8 +206,11 @@ void readArrayFromFile(int layout[10][10], char filepath[])
     if (file) {
         while ((c = getc(file)) != EOF)
         {
-            if (c != '\n' && c != ' ') {
-                layout[row][col] = (int)c-(int)'0';
+            // getting the number corresponding to the ASCII value
+            // and checking that the char is a number between 0 and 9
+            int val = (int)c-(int)'0';
+            if (val >= 0 && val < 10) {
+                layout[row][col] = val;
                 row++;
             }
             if(c == '\n' && row > 0){
@@ -215,24 +222,23 @@ void readArrayFromFile(int layout[10][10], char filepath[])
     }
 }
 
-Model *groundModel;
 
 struct model_data
 {
     Model *model;
     mat4 transformationMatrix;
     mat4 importMatrix;
-    int textureScale;
+    float textureScale;
     _Bool isShaded;
     int textureId;
     int specularExponent;
 };
 
-struct model_data skybox, ground, walls[2];
+struct model_data skybox, ground, walls[dim_x*dim_y];
 
 struct model_data init_model_data(struct model_data model, char rel_model_path[],
                      char rel_tex_path[], mat4 importMatrix,
-                     mat4 transformationMatrix, int textureScale,
+                     mat4 transformationMatrix, float textureScale,
                      _Bool isShaded,int specularExponent)
 {
     char abs_model_path[PATH_MAX];
@@ -255,7 +261,7 @@ void load_model_data(struct model_data model)
     mat4 modelMatrix = Mult(model.importMatrix,model.transformationMatrix);
     glUniformMatrix4fv(glGetUniformLocation(program, "modelMatrix"), 1, GL_TRUE, modelMatrix.m);
     glBindTexture(GL_TEXTURE_2D, model.textureId);
-    glUniform1i(glGetUniformLocation(program, "textureRepeats"), model.textureScale);
+    glUniform1f(glGetUniformLocation(program, "textureRepeats"), model.textureScale);
     glUniform1i(glGetUniformLocation(program, "isShaded"), model.isShaded);
     glUniform1f(glGetUniformLocation(program, "specularExponent"), model.specularExponent);
 }
@@ -296,7 +302,7 @@ void init(void)
     mat4 rot, trans, scale, transformationMatrix;
     char model_path[PATH_MAX];
     char tex_path[PATH_MAX];
-    int texScale;
+    float texScale;
     _Bool isShaded;
     int specExp;
 
@@ -308,11 +314,11 @@ void init(void)
     // ground model
     import_trans = T(0, 0, 0);
     import_rot = Rx(0);
-    import_scale = S(10.0f, 10.0f, 10.0f);
+    import_scale = S((dim_x-1)/2.0f, 1.0f, (dim_y-1)/2.0f);
     importMatrix = Mult(import_trans,Mult(import_rot, import_scale));
     strcpy(model_path, "Data/Models/Plane/plane.obj");
-    strcpy(tex_path, "Data/Textures/maskros512.tga");
-    texScale = 50;
+    strcpy(tex_path, "Data/Textures/No_texture/no_texture.tga");
+    texScale = (dim_x-1)/2.0f;
     isShaded = 1;
     specExp = specularExponent[0];
     
@@ -321,28 +327,27 @@ void init(void)
     
     // wall models
     strcpy(model_path, "Data/Models/Wall/wall.obj");
-    strcpy(tex_path, "Data/Textures/maskros512.tga");
+    strcpy(tex_path, "Data/Textures/No_texture/no_texture.tga");
     texScale = 50;
     isShaded = 1;
     specExp = specularExponent[0];
     
     
     
-    int rows = 10;
-    int cols = 10;
+    int rows = dim_y;
+    int cols = dim_x;
     int layout[rows][cols];
-    readArrayFromFile(layout, "Data/Levels/Level_1/layout.txt");
+    readLevelFromFile(layout, "Data/Levels/Level_1/layout.txt");
     int wall_index = 0;
     for (int row = 0; row < rows; ++row)
     {
         for (int col = 0; col < cols; ++col)
         {
-            printf("boop\n");
-            printf("row: %d, col: %d\n", row, col);
-            if (layout[row][col] == 1)
+            int val = layout[col][row];
+            if (val == 1 || val == 2)
             {
-                import_trans = T(col, 0, row);
-                import_rot = Ry((0*0.25f)*M_PI*2);
+                import_trans = T(1*col-(cols-1)/2.0f, 0, 1*row-(rows-1)/2.0f);
+                import_rot = Ry((val*0.25f)*M_PI*2);
                 import_scale = S(1.0f, 1.0f, 1.0f);
                 importMatrix = Mult(import_trans,Mult(import_rot, import_scale));
 
@@ -386,10 +391,14 @@ void display(void)
     load_model_data(ground);
     DrawModel(ground.model, program, "in_Position", "in_Normal", "in_TexCoord");
     // wall models
-    load_model_data(walls[0]);
-    DrawModel(walls[0].model, program, "in_Position", "in_Normal", "in_TexCoord");
-    load_model_data(walls[1]);
-    DrawModel(walls[1].model, program, "in_Position", "in_Normal", "in_TexCoord");
+    for (int i=0; i<dim_x*dim_y; ++i)
+    {
+        if (walls[i].textureId > 0)
+        {
+            load_model_data(walls[i]);
+            DrawModel(walls[i].model, program, "in_Position", "in_Normal", "in_TexCoord");
+        }
+    }
 
     keyPress();
 
@@ -405,7 +414,7 @@ int main(int argc, char *argv[])
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
     glutInitContextVersion(3, 2);
-    glutCreateWindow ("GL3 white triangle example");
+    glutCreateWindow ("computer graphics project");
     glutDisplayFunc(display);
     //glutPassiveMotionFunc(mouseHover);
     glutMotionFunc(mouseDrag);
