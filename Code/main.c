@@ -1,11 +1,4 @@
 
-// Should work as is on Linux and Mac. MS Windows needs GLEW or glee.
-// See separate Visual Studio version of my demos.
-#ifdef __APPLE__
-    #include <OpenGL/gl3.h>
-    // Linking hint for Lightweight IDE
-    // uses framework Cocoa
-#endif
 #include "MicroGlut.h"
 #include "GL_utilities.h"
 #include <math.h>
@@ -16,9 +9,6 @@
 #include <string.h>
 #include <limits.h>
 #include <stdlib.h>
-
-
-
 
 // Reference to shader program
 GLuint program;
@@ -39,27 +29,22 @@ GLfloat projectionMatrix[] =
     0.0f, 0.0f, -1.0f, 0.0f
 };
 
-void OnTimer(int value)
-{
-    glutPostRedisplay();
-    glutTimerFunc(20, &OnTimer, value);
-}
-
 // map dimensions
 #define dim_x 10
 #define dim_y 10
 
 // initial camera matrix
-GLfloat x_diff = 0;
-GLfloat y_diff = 0;
-
 vec3 p_vector = {0,23,1};
 vec3 l_vector = {0,0,0};
 vec3 v_vector = {0,1,0};
 mat4 cameraMatrix;
 
+GLfloat x_diff = 0;
+GLfloat y_diff = 0;
+
 vec3 direction_forwards, direction_up, direction_to_the_right;
 
+// light sources
 vec3 lightSourcesColorsArr[] =
 {
     {1.0f, 0.0f, 0.0f}, // Red light
@@ -67,7 +52,9 @@ vec3 lightSourcesColorsArr[] =
     {0.0f, 0.0f, 1.0f}, // Blue light
     {1.0f, 1.0f, 1.0f}  // White light
 };
+
 GLint isDirectional[] = {0,0,1,1};
+
 vec3 lightSourcesDirectionsPositions[] =
 {
     {10.0f, 5.0f, 0.0f}, // Red light, positional
@@ -75,6 +62,7 @@ vec3 lightSourcesDirectionsPositions[] =
     {-1.0f, 0.0f, 0.0f}, // Blue light along X
     {0.0f, 0.0f, -1.0f}  // White light along Z
 };
+
 GLfloat specularExponent[] = {0.0, 25.0, 50.0, 100.0, 200.0, 400.0};
 
 float max(float a, float b)
@@ -203,17 +191,20 @@ void readLevelFromFile(int layout[dim_y][dim_x], char filepath[])
     int c;
     FILE *file;
     file = fopen(file_path, "r");
-    if (file) {
+    if (file)
+    {
         while ((c = getc(file)) != EOF)
         {
             // getting the number corresponding to the ASCII value
             // and checking that the char is a number between 0 and 9
             int val = (int)c-(int)'0';
-            if (val >= 0 && val < 10) {
+            if (val >= 0 && val < 10)
+            {
                 layout[row][col] = val;
                 row++;
             }
-            if(c == '\n' && row > 0){
+            if(c == '\n' && row > 0)
+            {
                 col++;
                 row=0;
             }
@@ -221,7 +212,6 @@ void readLevelFromFile(int layout[dim_y][dim_x], char filepath[])
         fclose(file);
     }
 }
-
 
 struct model_data
 {
@@ -251,8 +241,11 @@ struct model_data init_model_data(struct model_data model, char rel_model_path[]
     model.textureScale = textureScale;
     model.transformationMatrix = transformationMatrix;
     model.importMatrix = importMatrix;
-    model.isShaded = isShaded;
     model.specularExponent = specularExponent;
+    // models using no_texture.tga shouldn't be affected by lighting
+    if (strstr(abs_tex_path,"no_texture.tga")) { model.isShaded = 0; }
+    else { model.isShaded = isShaded; }
+
     return model;
 }
 
@@ -266,6 +259,11 @@ void load_model_data(struct model_data model)
     glUniform1f(glGetUniformLocation(program, "specularExponent"), model.specularExponent);
 }
 
+void OnTimer(int value)
+{
+    glutPostRedisplay();
+    glutTimerFunc(20, &OnTimer, value);
+}
 
 void init(void)
 {
@@ -311,7 +309,7 @@ void init(void)
     scale = S(1.0f, 1.0f, 1.0f);
     transformationMatrix = Mult(trans,Mult(rot, scale));
 
-    // ground model
+    // init ground model
     import_trans = T(0, 0, 0);
     import_rot = Rx(0);
     import_scale = S((dim_x-1)/2.0f, 1.0f, (dim_y-1)/2.0f);
@@ -321,19 +319,17 @@ void init(void)
     texScale = (dim_x-1)/2.0f;
     isShaded = 1;
     specExp = specularExponent[0];
-    
+
     ground = init_model_data(ground,model_path,tex_path,importMatrix,
                     transformationMatrix,texScale,isShaded,specExp);
-    
-    // wall models
+
+    // init wall models
     strcpy(model_path, "Data/Models/Wall/wall.obj");
     strcpy(tex_path, "Data/Textures/No_texture/no_texture.tga");
     texScale = 50;
     isShaded = 1;
     specExp = specularExponent[0];
-    
-    
-    
+
     int rows = dim_y;
     int cols = dim_x;
     int layout[rows][cols];
@@ -353,44 +349,37 @@ void init(void)
 
                 walls[wall_index] = init_model_data(walls[wall_index],model_path,tex_path,importMatrix,
                 transformationMatrix,texScale,isShaded,specExp);
-                
+
                 wall_index++;
             }
         }
     }
-
     printError("init arrays");
 }
-
 
 void display(void)
 {
     printError("pre display");
 
-
     glUniform3fv(glGetUniformLocation(program, "lightSourcesDirPosArr"), 4, &lightSourcesDirectionsPositions[0].x);
     glUniform3fv(glGetUniformLocation(program, "lightSourcesColorArr"), 4, &lightSourcesColorsArr[0].x);
     glUniform1iv(glGetUniformLocation(program, "isDirectional"), 4, isDirectional);
 
-
     GLfloat t = (GLfloat)(glutGet(GLUT_ELAPSED_TIME));
     GLfloat time;
 
-
     // clear the screen
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-
 
     mat4 import_rot, import_trans, import_scale, importMatrix;
     mat4 rot, trans, scale, transformationMatrix;
     mat4 modelMatrix;
     GLfloat tx, ty, tz, sx, sy, sz, rx, ry, rz;
 
-    // ground model
+    // display ground model
     load_model_data(ground);
     DrawModel(ground.model, program, "in_Position", "in_Normal", "in_TexCoord");
-    // wall models
+    // display wall models
     for (int i=0; i<dim_x*dim_y; ++i)
     {
         if (walls[i].textureId > 0)
@@ -399,15 +388,12 @@ void display(void)
             DrawModel(walls[i].model, program, "in_Position", "in_Normal", "in_TexCoord");
         }
     }
-
     keyPress();
 
     printError("display");
 
     glutSwapBuffers();
 }
-
-
 
 int main(int argc, char *argv[])
 {
@@ -422,7 +408,6 @@ int main(int argc, char *argv[])
     init ();
     // Timer
     glutTimerFunc(20, &OnTimer, 0);
-
     glutMainLoop();
     return 0;
 }
