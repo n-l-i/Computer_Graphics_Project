@@ -5,9 +5,10 @@ This is a computer graphics project.
 ## Usage
 
 You need to first compile the project and then run it.
+Here are the commands to run the project:
 
-* run `(cd <project path> && make)` to compile the project.
-* run `(cd <project path> && ./3D_project.out)` to run the compiled file.
+* to compile the project: `(cd <project path> && make)`
+* to run the compiled file: `(cd <project path> && ./3D_project.out)`
 
 The project currently only runs on Linux.
 
