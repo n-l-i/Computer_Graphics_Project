@@ -34,9 +34,12 @@ GLfloat projectionMatrix[] =
 #define dim_y 10
 
 // initial camera matrix
-vec3 p_vector = {0,23,1};
-vec3 l_vector = {0,0,0};
-vec3 v_vector = {0,1,0};
+vec3 init_p_vector = {-1,2,0};
+vec3 init_l_vector = {1,2,-1};
+vec3 init_v_vector = {0,1,0};
+vec3 p_vector;
+vec3 l_vector;
+vec3 v_vector;
 mat4 cameraMatrix;
 
 GLfloat x_diff = 0;
@@ -143,6 +146,7 @@ void mouseDrag(int x, int y)
 
     vec3 new_l = VectorAdd(VectorAdd(x_movement,y_movement), p_vector);
     l_vector = new_l;
+
     cameraMatrix = lookAtv(p_vector, l_vector, v_vector);
     glUniformMatrix4fv(glGetUniformLocation(program, "cameraMatrix"), 1, GL_TRUE, cameraMatrix.m);
     glUniform3fv(glGetUniformLocation(program, "cameraPosition"), 1, &p_vector);
@@ -164,9 +168,17 @@ void mouseClick(int button, int state, int x, int y)
             x_diff = 0;
             y_diff = 0;
 
-            p_vector = SetVector(2*sin(-M_PI/4 + M_PI/2),2,2*sin(-M_PI/4));
-            l_vector = SetVector(2*sin(-M_PI/4 + M_PI/2)+1,2+0,2*sin(-M_PI/4)+0);
-            v_vector = SetVector(0,1,0);
+            float new_px = 2*sin(acos(init_p_vector.x/2.0f)+2.0f*M_PI*1.0f + M_PI/2);
+            float new_py = init_p_vector.y;
+            float new_pz = 2*sin(asin(init_p_vector.z/2.0f)+2.0f*M_PI*1.0f);
+
+            float new_lx = 2*sin(acos(init_l_vector.x/2.0f)+2.0f*M_PI*1.0f + M_PI/2);
+            float new_ly = init_l_vector.y;
+            float new_lz = 2*sin(asin(init_l_vector.z/2.0f)+2.0f*M_PI*1.0f);
+
+            p_vector = SetVector(new_px,new_py,new_pz);
+            l_vector = SetVector(new_lx,new_ly,new_lz);
+            v_vector = init_v_vector;
 
             cameraMatrix = lookAtv(p_vector, l_vector, v_vector);
             glUniformMatrix4fv(glGetUniformLocation(program, "cameraMatrix"), 1, GL_TRUE, cameraMatrix.m);
@@ -283,6 +295,10 @@ void init(void)
     program = loadShaders(main_vert_path, main_frag_path);
     printError("init shader");
 
+    p_vector = init_p_vector;
+    l_vector = init_l_vector;
+    v_vector = init_v_vector;
+
     direction_up = SetVector(0.0f,1.0f,0.0f);
     direction_forwards = VectorAdd(p_vector,ScalarMult(l_vector, -1));
     direction_to_the_right = cross(direction_forwards, direction_up);
@@ -294,7 +310,7 @@ void init(void)
     glUniformMatrix4fv(glGetUniformLocation(program, "cameraMatrix"), 1, GL_TRUE, cameraMatrix.m);
     glUniform3fv(glGetUniformLocation(program, "cameraPosition"), 1, &p_vector);
 
-    //mouseDrag(prev_1_click.x, prev_1_click.y);
+    mouseDrag(prev_1_click.x, prev_1_click.y);
 
     mat4 import_rot, import_trans, import_scale, importMatrix;
     mat4 rot, trans, scale, transformationMatrix;
