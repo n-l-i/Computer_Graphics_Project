@@ -192,39 +192,6 @@ void mouseClick(int button, int state, int x, int y)
     }
 }
 
-void readLevelFromFile(int layout[dim_y][dim_x], char filepath[])
-{
-    int rows = dim_y;
-    int cols = dim_x;
-    int row=0;
-    int col=0;
-    char file_path[PATH_MAX];
-    char *r_file = realpath("Data/Levels/Level_1/layout.txt", file_path);
-    int c;
-    FILE *file;
-    file = fopen(file_path, "r");
-    if (file)
-    {
-        while ((c = getc(file)) != EOF)
-        {
-            // getting the number corresponding to the ASCII value
-            // and checking that the char is a number between 0 and 9
-            int val = (int)c-(int)'0';
-            if (val >= 0 && val < 10)
-            {
-                layout[row][col] = val;
-                row++;
-            }
-            if(c == '\n' && row > 0)
-            {
-                col++;
-                row=0;
-            }
-        }
-        fclose(file);
-    }
-}
-
 struct model_data
 {
     Model *model;
@@ -269,6 +236,124 @@ void load_model_data(struct model_data model)
     glUniform1f(glGetUniformLocation(program, "textureRepeats"), model.textureScale);
     glUniform1i(glGetUniformLocation(program, "isShaded"), model.isShaded);
     glUniform1f(glGetUniformLocation(program, "specularExponent"), model.specularExponent);
+}
+
+void readLevelFromFile(int layout[dim_y][dim_x], char filepath[])
+{
+    int rows = dim_y;
+    int cols = dim_x;
+    int row=0;
+    int col=0;
+    char file_path[PATH_MAX];
+    char *r_file = realpath("Data/Levels/Level_1/layout.txt", file_path);
+    int c;
+    FILE *file;
+    file = fopen(file_path, "r");
+    if (file)
+    if (file)
+    {
+        _Bool commented_line = 0;
+        while ((c = getc(file)) != EOF)
+        {
+            if (c == '/') { commented_line = 1; }
+            if (c == '\n') { commented_line = 0; }
+            if (!commented_line)
+            {
+                if (c == '.') { layout[row][col] = 0; row++; }
+                if (c == '<') { layout[row][col] = 1; row++; }
+                if (c == '^') { layout[row][col] = 2; row++; }
+                if (c == '>') { layout[row][col] = 3; row++; }
+                if (c == 'v') { layout[row][col] = 4; row++; }
+                if (c == '\n' && row > 0) { row=0; col++; }
+            }
+        }
+        fclose(file);
+    }
+}
+
+void place_walls(int layout[dim_y][dim_x])
+{
+    mat4 import_rot, import_trans, import_scale, importMatrix;
+    mat4 rot, trans, scale, transformationMatrix;
+    trans = T(0.0f, 0.0f, 0.0f);
+    rot = Rx(0.0f);
+    scale = S(1.0f, 1.0f, 1.0f);
+    transformationMatrix = Mult(trans,Mult(rot, scale));
+    char model_path[PATH_MAX];
+    char tex_path[PATH_MAX];
+
+    // init wall models
+    strcpy(model_path, "Data/Models/Wall/wall.obj");
+    strcpy(tex_path, "Data/Textures/No_texture/no_texture.tga");
+    int texScale = 50;
+    int isShaded = 1;
+    int specExp = specularExponent[0];
+
+    int rows = dim_y;
+    int cols = dim_x;
+    int wall_index = 0;
+    import_scale = S(1.0f, 1.0f, 1.0f);
+
+    // placing all walls marked in the layout file
+    for (int row = 0; row < rows; ++row)
+    {
+        for (int col = 0; col < cols; ++col)
+        {
+            int val = layout[col][row];
+            if (val > 0)
+            {
+                if (val == 1) { import_trans = T(2*(col+0)-(cols), 0, 2*(row+0)-(rows)); }
+                if (val == 2) { import_trans = T(2*(col+1)-(cols), 0, 2*(row+0)-(rows)); }
+                if (val == 3) { import_trans = T(2*(col+1)-(cols), 0, 2*(row+1)-(rows)); }
+                if (val == 4) { import_trans = T(2*(col+0)-(cols), 0, 2*(row+1)-(rows)); }
+                import_rot = Ry((val*0.75f)*M_PI*2);
+                importMatrix = Mult(import_trans,Mult(import_rot, import_scale));
+
+                walls[wall_index] = init_model_data(walls[wall_index],model_path,tex_path,importMatrix,
+                transformationMatrix,texScale,isShaded,specExp);
+
+                wall_index++;
+            }
+        }
+    }
+    // checking if additional walls may need to be placed to create nice corners
+    for (int row = 0; row < rows; ++row)
+    {
+        for (int col = 0; col < cols; ++col)
+        {
+            int val = layout[col][row];
+            if (val > 0)
+            {
+                int neighbour_behind_val = -1;
+                int row_diff, col_diff;
+                if (val == 1) { row_diff = 0; col_diff = 1; }
+                if (val == 2) { row_diff = 1; col_diff = 0; }
+                if (val == 3) { row_diff = 0; col_diff = -1; }
+                if (val == 4) { row_diff = -1; col_diff = 0; }
+                if (col+col_diff < cols && col+col_diff>=0 && row+row_diff < rows && row+row_diff>=0)
+                {
+                    neighbour_behind_val = layout[col+col_diff][row+row_diff];
+                }
+
+                _Bool make_corner = neighbour_behind_val > 0 && abs(val - neighbour_behind_val) != 2;
+
+                if (make_corner)
+                {
+                    if (neighbour_behind_val == 1) { import_trans = T(2*(col+0)-(cols), 0, 2*(row+0)-(rows)); }
+                    if (neighbour_behind_val == 2) { import_trans = T(2*(col+1)-(cols), 0, 2*(row+0)-(rows)); }
+                    if (neighbour_behind_val == 3) { import_trans = T(2*(col+1)-(cols), 0, 2*(row+1)-(rows)); }
+                    if (neighbour_behind_val == 4) { import_trans = T(2*(col+0)-(cols), 0, 2*(row+1)-(rows)); }
+                    import_rot = Ry((neighbour_behind_val*0.75f)*M_PI*2);
+                    importMatrix = Mult(import_trans,Mult(import_rot, import_scale));
+
+                    walls[wall_index] = init_model_data(walls[wall_index],model_path,tex_path,importMatrix,
+                    transformationMatrix,texScale,isShaded,specExp);
+
+                    wall_index++;
+                }
+            }
+        }
+    }
 }
 
 void OnTimer(int value)
@@ -328,11 +413,11 @@ void init(void)
     // init ground model
     import_trans = T(0, 0, 0);
     import_rot = Rx(0);
-    import_scale = S((dim_x-1)/2.0f, 1.0f, (dim_y-1)/2.0f);
+    import_scale = S(dim_x, 1.0f, dim_y);
     importMatrix = Mult(import_trans,Mult(import_rot, import_scale));
     strcpy(model_path, "Data/Models/Plane/plane.obj");
     strcpy(tex_path, "Data/Textures/No_texture/no_texture.tga");
-    texScale = (dim_x-1)/2.0f;
+    texScale = dim_x;
     isShaded = 1;
     specExp = specularExponent[0];
 
@@ -340,36 +425,10 @@ void init(void)
                     transformationMatrix,texScale,isShaded,specExp);
 
     // init wall models
-    strcpy(model_path, "Data/Models/Wall/wall.obj");
-    strcpy(tex_path, "Data/Textures/No_texture/no_texture.tga");
-    texScale = 50;
-    isShaded = 1;
-    specExp = specularExponent[0];
-
-    int rows = dim_y;
-    int cols = dim_x;
-    int layout[rows][cols];
+    int layout[dim_y][dim_x];
     readLevelFromFile(layout, "Data/Levels/Level_1/layout.txt");
-    int wall_index = 0;
-    for (int row = 0; row < rows; ++row)
-    {
-        for (int col = 0; col < cols; ++col)
-        {
-            int val = layout[col][row];
-            if (val == 1 || val == 2)
-            {
-                import_trans = T(1*col-(cols-1)/2.0f, 0, 1*row-(rows-1)/2.0f);
-                import_rot = Ry((val*0.25f)*M_PI*2);
-                import_scale = S(1.0f, 1.0f, 1.0f);
-                importMatrix = Mult(import_trans,Mult(import_rot, import_scale));
+    place_walls(layout);
 
-                walls[wall_index] = init_model_data(walls[wall_index],model_path,tex_path,importMatrix,
-                transformationMatrix,texScale,isShaded,specExp);
-
-                wall_index++;
-            }
-        }
-    }
     printError("init arrays");
 }
 
