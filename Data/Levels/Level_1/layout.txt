@@ -1,14 +1,17 @@
 
-layout of walls, where one means oriented north to south
-and two means oriented east to west:
+// layout of walls.
+// < means wall oriented facing west,
+// ^ means wall oriented facing north,
+// > means wall oriented facing east,
+// v means wall oriented facing south
 
-    1 0 1 0 1 1 0 1 0 1
-    0 0 0 0 0 0 0 0 0 0
-    0 0 0 0 0 0 0 0 0 0
-    0 0 0 0 0 0 0 0 0 0
-    0 0 0 0 1 2 0 0 0 0
-    0 0 0 0 0 0 0 0 0 0
-    0 0 0 0 0 0 0 0 0 1
-    0 0 0 0 0 0 0 0 0 0
-    0 0 0 0 0 0 0 0 0 1
-    0 0 0 0 0 0 2 0 2 0
+    . v v v v . . v v .
+    > . . . . < > . . <
+    > . ^ ^ . < . ^ . <
+    > . < > . v v > . <
+    > . v v . . . . . <
+    > . . . . < ^ ^ ^ .
+    > . ^ ^ . < . . . .
+    > . < > . < v v v v
+    > . < > . . . . . .
+    > . < . ^ ^ ^ ^ ^ ^
