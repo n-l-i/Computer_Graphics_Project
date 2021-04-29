@@ -1,19 +1,24 @@
+#include <essentials.h>
 
-#include "MicroGlut.h"
-#include "GL_utilities.h"
-#include <math.h>
+#include "map_functions.h"
+#include "user_input.h"
+#include "model_data_functions.h"
 
-#include <stdio.h>
-#include "LittleOBJLoader.h"
-
-#include <string.h>
-#include <limits.h>
-#include <stdlib.h>
-
-// Reference to shader program
-GLuint program;
 
 GLuint textureId = 1;
+
+
+// initial camera matrix
+vec3 init_p_vector = {-1,2,0};
+vec3 init_l_vector = {1,2,-1};
+vec3 init_v_vector = {0,1,0};
+vec3 p_vector;
+vec3 l_vector;
+vec3 v_vector;
+mat4 cameraMatrix;
+
+GLfloat x_diff = 0;
+GLfloat y_diff = 0;
 
 #define near 1.0
 #define far 30.0
@@ -28,24 +33,6 @@ GLfloat projectionMatrix[] =
     0.0f, 0.0f, -(far + near)/(far - near), -2*far*near/(far - near),
     0.0f, 0.0f, -1.0f, 0.0f
 };
-
-// map dimensions
-#define dim_x 10
-#define dim_y 10
-
-// initial camera matrix
-vec3 init_p_vector = {-1,2,0};
-vec3 init_l_vector = {1,2,-1};
-vec3 init_v_vector = {0,1,0};
-vec3 p_vector;
-vec3 l_vector;
-vec3 v_vector;
-mat4 cameraMatrix;
-
-GLfloat x_diff = 0;
-GLfloat y_diff = 0;
-
-vec3 direction_forwards, direction_up, direction_to_the_right;
 
 // light sources
 vec3 lightSourcesColorsArr[] =
@@ -68,293 +55,7 @@ vec3 lightSourcesDirectionsPositions[] =
 
 GLfloat specularExponent[] = {0.0, 25.0, 50.0, 100.0, 200.0, 400.0};
 
-float max(float a, float b)
-{
-    if( a > b ) { return a; }
-    return b;
-}
-float min(float a, float b)
-{
-    if( a < b ) { return a; }
-    return b;
-}
-
-void keyPress()
-{
-    vec3 movement = {0.0f,0.0f,0.0f};
-    //  move forwards
-    if (glutKeyIsDown('w'))
-    {
-        vec3 w_movement = ScalarMult(direction_forwards, -1.0f/10.0f);
-        movement = VectorAdd(movement, SetVector(w_movement.x, 0, w_movement.z));
-    }
-    //  move backwards
-    if (glutKeyIsDown('s'))
-    {
-        vec3 s_movement = ScalarMult(direction_forwards, 1.0f/10.0f);
-        movement = VectorAdd(movement, SetVector(s_movement.x, 0, s_movement.z));
-    }
-    //  move left
-    if (glutKeyIsDown('a'))
-    {
-        movement = VectorAdd(movement, ScalarMult(direction_to_the_right, 1.0f/10.0f));
-    }
-    //  move right
-    if (glutKeyIsDown('d'))
-    {
-        movement = VectorAdd(movement, ScalarMult(direction_to_the_right, -1.0f/10.0f));
-    }
-    //  move up
-    if (glutKeyIsDown(' '))
-    {
-        movement = VectorAdd(movement, ScalarMult(direction_up, 1.0f/10.0f));
-    }
-    //  move down
-    if (glutKeyIsDown('f'))
-    {
-        movement = VectorAdd(movement, ScalarMult(direction_up, -1.0f/10.0f));
-    }
-
-    p_vector = VectorAdd(p_vector, movement);
-    l_vector = VectorAdd(l_vector, movement);
-    cameraMatrix = lookAtv(p_vector, l_vector, v_vector);
-    glUniformMatrix4fv(glGetUniformLocation(program, "cameraMatrix"), 1, GL_TRUE, cameraMatrix.m);
-    glUniform3fv(glGetUniformLocation(program, "cameraPosition"), 1, &p_vector);
-
-    direction_forwards = VectorAdd(p_vector,ScalarMult(l_vector, -1));
-    direction_to_the_right = cross(direction_forwards, direction_up);
-}
-
-vec2 prev_1_click;
-vec2 prev_2_click;
-_Bool clicked_previously;
-
-void mouseDrag(int x, int y)
-{
-    // camera position
-    x_diff += -(x - prev_1_click.x)/100;
-    y_diff += -(y - prev_1_click.y)/100;
-    y_diff = min(max(y_diff, -0.99), 0.99);
-    prev_2_click.x = prev_1_click.x;
-    prev_2_click.y = prev_1_click.y;
-    prev_1_click.x = x;
-    prev_1_click.y = y;
-    clicked_previously = 0;
-
-    vec3 y_movement = SetVector(0, sin(y_diff*M_PI/2), 0);
-    vec3 x_movement = SetVector(sin(x_diff*M_PI/2), 0, sin(M_PI/2+x_diff*M_PI/2));
-
-    vec3 new_l = VectorAdd(VectorAdd(x_movement,y_movement), p_vector);
-    l_vector = new_l;
-
-    cameraMatrix = lookAtv(p_vector, l_vector, v_vector);
-    glUniformMatrix4fv(glGetUniformLocation(program, "cameraMatrix"), 1, GL_TRUE, cameraMatrix.m);
-    glUniform3fv(glGetUniformLocation(program, "cameraPosition"), 1, &p_vector);
-
-    direction_forwards = VectorAdd(p_vector,ScalarMult(l_vector, -1));
-    direction_to_the_right = cross(direction_forwards, direction_up);
-}
-
-void mouseClick(int button, int state, int x, int y)
-{
-    if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
-    {
-        prev_2_click.x = prev_1_click.x;
-        prev_2_click.y = prev_1_click.y;
-        prev_1_click.x = x;
-        prev_1_click.y = y;
-        if( prev_2_click.x == x && prev_2_click.y == y && clicked_previously == 1 )
-        {
-            x_diff = 0;
-            y_diff = 0;
-
-            float new_px = 2*sin(acos(init_p_vector.x/2.0f)+2.0f*M_PI*1.0f + M_PI/2);
-            float new_py = init_p_vector.y;
-            float new_pz = 2*sin(asin(init_p_vector.z/2.0f)+2.0f*M_PI*1.0f);
-
-            float new_lx = 2*sin(acos(init_l_vector.x/2.0f)+2.0f*M_PI*1.0f + M_PI/2);
-            float new_ly = init_l_vector.y;
-            float new_lz = 2*sin(asin(init_l_vector.z/2.0f)+2.0f*M_PI*1.0f);
-
-            p_vector = SetVector(new_px,new_py,new_pz);
-            l_vector = SetVector(new_lx,new_ly,new_lz);
-            v_vector = init_v_vector;
-
-            cameraMatrix = lookAtv(p_vector, l_vector, v_vector);
-            glUniformMatrix4fv(glGetUniformLocation(program, "cameraMatrix"), 1, GL_TRUE, cameraMatrix.m);
-            glUniform3fv(glGetUniformLocation(program, "cameraPosition"), 1, &p_vector);
-
-            direction_forwards = VectorAdd(p_vector,ScalarMult(l_vector, -1));
-            direction_to_the_right = cross(direction_forwards, direction_up);
-            mouseDrag(prev_1_click.x, prev_1_click.y);
-        }
-    clicked_previously = 1;
-    }
-}
-
-struct model_data
-{
-    Model *model;
-    mat4 transformationMatrix;
-    mat4 importMatrix;
-    float textureScale;
-    _Bool isShaded;
-    int textureId;
-    int specularExponent;
-};
-
 struct model_data skybox, ground, walls[dim_x*dim_y];
-
-struct model_data init_model_data(struct model_data model, char rel_model_path[],
-                     char rel_tex_path[], mat4 importMatrix,
-                     mat4 transformationMatrix, float textureScale,
-                     _Bool isShaded,int specularExponent)
-{
-    char abs_model_path[PATH_MAX];
-    char *r_model = realpath(rel_model_path, abs_model_path);
-    char abs_tex_path[PATH_MAX];
-    char *r_tex = realpath(rel_tex_path, abs_tex_path);
-    model.model = LoadModel(abs_model_path);
-    LoadTGATextureSimple(abs_tex_path, &textureId);
-    model.textureId = textureId++;
-    model.textureScale = textureScale;
-    model.transformationMatrix = transformationMatrix;
-    model.importMatrix = importMatrix;
-    model.specularExponent = specularExponent;
-    // models using no_texture.tga shouldn't be affected by lighting
-    if (strstr(abs_tex_path,"no_texture.tga")) { model.isShaded = 0; }
-    else { model.isShaded = isShaded; }
-
-    return model;
-}
-
-void load_model_data(struct model_data model)
-{
-    mat4 modelMatrix = Mult(model.importMatrix,model.transformationMatrix);
-    glUniformMatrix4fv(glGetUniformLocation(program, "modelMatrix"), 1, GL_TRUE, modelMatrix.m);
-    glBindTexture(GL_TEXTURE_2D, model.textureId);
-    glUniform1f(glGetUniformLocation(program, "textureRepeats"), model.textureScale);
-    glUniform1i(glGetUniformLocation(program, "isShaded"), model.isShaded);
-    glUniform1f(glGetUniformLocation(program, "specularExponent"), model.specularExponent);
-}
-
-void readLevelFromFile(int layout[dim_y][dim_x], char filepath[])
-{
-    int rows = dim_y;
-    int cols = dim_x;
-    int row=0;
-    int col=0;
-    char file_path[PATH_MAX];
-    char *r_file = realpath("Data/Levels/Level_1/layout.txt", file_path);
-    int c;
-    FILE *file;
-    file = fopen(file_path, "r");
-    if (file)
-    if (file)
-    {
-        _Bool commented_line = 0;
-        while ((c = getc(file)) != EOF)
-        {
-            if (c == '/') { commented_line = 1; }
-            if (c == '\n') { commented_line = 0; }
-            if (!commented_line)
-            {
-                if (c == '.') { layout[row][col] = 0; row++; }
-                if (c == '<') { layout[row][col] = 1; row++; }
-                if (c == '^') { layout[row][col] = 2; row++; }
-                if (c == '>') { layout[row][col] = 3; row++; }
-                if (c == 'v') { layout[row][col] = 4; row++; }
-                if (c == '\n' && row > 0) { row=0; col++; }
-            }
-        }
-        fclose(file);
-    }
-}
-
-void place_walls(int layout[dim_y][dim_x])
-{
-    mat4 import_rot, import_trans, import_scale, importMatrix;
-    mat4 rot, trans, scale, transformationMatrix;
-    trans = T(0.0f, 0.0f, 0.0f);
-    rot = Rx(0.0f);
-    scale = S(1.0f, 1.0f, 1.0f);
-    transformationMatrix = Mult(trans,Mult(rot, scale));
-    char model_path[PATH_MAX];
-    char tex_path[PATH_MAX];
-
-    // init wall models
-    strcpy(model_path, "Data/Models/Wall/wall.obj");
-    strcpy(tex_path, "Data/Textures/No_texture/no_texture.tga");
-    int texScale = 50;
-    int isShaded = 1;
-    int specExp = specularExponent[0];
-
-    int rows = dim_y;
-    int cols = dim_x;
-    int wall_index = 0;
-    import_scale = S(1.0f, 1.0f, 1.0f);
-
-    // placing all walls marked in the layout file
-    for (int row = 0; row < rows; ++row)
-    {
-        for (int col = 0; col < cols; ++col)
-        {
-            int val = layout[col][row];
-            if (val > 0)
-            {
-                if (val == 1) { import_trans = T(2*(col+0)-(cols), 0, 2*(row+0)-(rows)); }
-                if (val == 2) { import_trans = T(2*(col+1)-(cols), 0, 2*(row+0)-(rows)); }
-                if (val == 3) { import_trans = T(2*(col+1)-(cols), 0, 2*(row+1)-(rows)); }
-                if (val == 4) { import_trans = T(2*(col+0)-(cols), 0, 2*(row+1)-(rows)); }
-                import_rot = Ry((val*0.75f)*M_PI*2);
-                importMatrix = Mult(import_trans,Mult(import_rot, import_scale));
-
-                walls[wall_index] = init_model_data(walls[wall_index],model_path,tex_path,importMatrix,
-                transformationMatrix,texScale,isShaded,specExp);
-
-                wall_index++;
-            }
-        }
-    }
-    // checking if additional walls may need to be placed to create nice corners
-    for (int row = 0; row < rows; ++row)
-    {
-        for (int col = 0; col < cols; ++col)
-        {
-            int val = layout[col][row];
-            if (val > 0)
-            {
-                int neighbour_behind_val = -1;
-                int row_diff, col_diff;
-                if (val == 1) { row_diff = 0; col_diff = 1; }
-                if (val == 2) { row_diff = 1; col_diff = 0; }
-                if (val == 3) { row_diff = 0; col_diff = -1; }
-                if (val == 4) { row_diff = -1; col_diff = 0; }
-                if (col+col_diff < cols && col+col_diff>=0 && row+row_diff < rows && row+row_diff>=0)
-                {
-                    neighbour_behind_val = layout[col+col_diff][row+row_diff];
-                }
-
-                _Bool make_corner = neighbour_behind_val > 0 && abs(val - neighbour_behind_val) != 2;
-
-                if (make_corner)
-                {
-                    if (neighbour_behind_val == 1) { import_trans = T(2*(col+0)-(cols), 0, 2*(row+0)-(rows)); }
-                    if (neighbour_behind_val == 2) { import_trans = T(2*(col+1)-(cols), 0, 2*(row+0)-(rows)); }
-                    if (neighbour_behind_val == 3) { import_trans = T(2*(col+1)-(cols), 0, 2*(row+1)-(rows)); }
-                    if (neighbour_behind_val == 4) { import_trans = T(2*(col+0)-(cols), 0, 2*(row+1)-(rows)); }
-                    import_rot = Ry((neighbour_behind_val*0.75f)*M_PI*2);
-                    importMatrix = Mult(import_trans,Mult(import_rot, import_scale));
-
-                    walls[wall_index] = init_model_data(walls[wall_index],model_path,tex_path,importMatrix,
-                    transformationMatrix,texScale,isShaded,specExp);
-
-                    wall_index++;
-                }
-            }
-        }
-    }
-}
 
 void OnTimer(int value)
 {
@@ -426,8 +127,8 @@ void init(void)
 
     // init wall models
     int layout[dim_y][dim_x];
-    readLevelFromFile(layout, "Data/Levels/Level_1/layout.txt");
-    place_walls(layout);
+    read_level_from_file(layout, "Data/Levels/Level_1/layout.txt");
+    place_walls(layout, walls);
 
     printError("init arrays");
 }
