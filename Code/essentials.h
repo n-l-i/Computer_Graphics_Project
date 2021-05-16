@@ -21,12 +21,12 @@
     #define MAP_SCALE 5
 
     // max number of lights
-    #define MAX_LIGHTS 4
+    #define MAX_LIGHTS 20
 
     // Reference to shader program
     GLuint program;
 
-    GLuint textureId;
+    int textureId;
     GLfloat time;
 
     GLfloat mouse_x;
