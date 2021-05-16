@@ -11,9 +11,9 @@ struct user_input_data reset_user_input(struct user_input_data user_input)
     return user_input;
 }
 
-struct user_input_data keyboard_func(struct user_input_data user_input)
+struct user_input_data get_user_input(struct user_input_data user_input)
 {
-    GLfloat movement_speed = 0.2;
+    GLfloat movement_speed = 0.4;
 
     if (glutKeyIsDown('w')) { user_input.movement.z += movement_speed; }
     if (glutKeyIsDown('s')) { user_input.movement.z -= movement_speed; }

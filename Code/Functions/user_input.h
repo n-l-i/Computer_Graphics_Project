@@ -9,7 +9,7 @@
         vec3 rotation;
     };
 
-    struct user_input_data keyboard_func(struct user_input_data user_input);
+    struct user_input_data get_user_input(struct user_input_data user_input);
 
     void mouse_func(int x,int y);
 
