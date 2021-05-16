@@ -1,189 +1,193 @@
 #include <essentials.h>
 
-#include "map_functions.h"
+#include "model_functions.h"
 #include "user_input.h"
-#include "model_data_functions.h"
+#include "camera.h"
 
-
-GLuint textureId = 1;
-
-
-// initial camera matrix
-vec3 init_p_vector = {-1,2,0};
-vec3 init_l_vector = {1,2,-1};
-vec3 init_v_vector = {0,1,0};
-vec3 p_vector;
-vec3 l_vector;
-vec3 v_vector;
-mat4 cameraMatrix;
-
-GLfloat x_diff = 0;
-GLfloat y_diff = 0;
-
+// Define a frustrum
 #define near 1.0
-#define far 30.0
+#define far 150.0
 #define right 0.5
 #define left -0.5
 #define top 0.5
 #define bottom -0.5
-GLfloat projectionMatrix[] =
-{
-    2.0f*near/(right-left), 0.0f, (right+left)/(right-left), 0.0f,
-    0.0f, 2.0f*near/(top-bottom), (top+bottom)/(top-bottom), 0.0f,
-    0.0f, 0.0f, -(far + near)/(far - near), -2*far*near/(far - near),
-    0.0f, 0.0f, -1.0f, 0.0f
-};
 
-// light sources
-vec3 lightSourcesColorsArr[] =
-{
-    {1.0f, 0.0f, 0.0f}, // Red light
-    {0.0f, 1.0f, 0.0f}, // Green light
-    {0.0f, 0.0f, 1.0f}, // Blue light
-    {1.0f, 1.0f, 1.0f}  // White light
-};
+// Init globals
+mat4 projectionMatrix;
+struct model_data skybox,ground,walls[MAP_DIM_X*MAP_DIM_Y],lamps[4];
+struct light_data lamp_lights[4];
+struct camera_data camera;
+struct user_input_data user_input;
+GLuint textureId = 1;
+GLfloat specularExponent[] = {0.0,25.0,50.0,100.0,200.0,400.0};
 
-GLint isDirectional[] = {0,0,1,1};
-
-vec3 lightSourcesDirectionsPositions[] =
-{
-    {10.0f, 5.0f, 0.0f}, // Red light, positional
-    {0.0f, 5.0f, 10.0f}, // Green light, positional
-    {-1.0f, 0.0f, 0.0f}, // Blue light along X
-    {0.0f, 0.0f, -1.0f}  // White light along Z
-};
-
-GLfloat specularExponent[] = {0.0, 25.0, 50.0, 100.0, 200.0, 400.0};
-
-struct model_data skybox, ground, walls[dim_x*dim_y];
-
-void OnTimer(int value)
-{
-    glutPostRedisplay();
-    glutTimerFunc(20, &OnTimer, value);
-}
-
-void init(void)
-{
+void init(void) {
     dumpInfo();
 
     // GL inits
     glClearColor(0.2,0.2,0.5,0);
     glEnable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
+    glEnable(GL_CULL_FACE);
     printError("GL inits");
 
     // Load and compile shader
-    char main_vert_path[PATH_MAX];
-    char *r_vert = realpath("Code/Shaders/main.vert", main_vert_path);
-    char main_frag_path[PATH_MAX];
-    char *r_frag = realpath("Code/Shaders/main.frag", main_frag_path);
-    program = loadShaders(main_vert_path, main_frag_path);
+    program = loadShaders("Code/Shaders/main.vert","Code/Shaders/main.frag");
     printError("init shader");
 
-    p_vector = init_p_vector;
-    l_vector = init_l_vector;
-    v_vector = init_v_vector;
+    camera = init_camera(camera);
+    user_input = reset_user_input(user_input);
+//     init_lights();
 
-    direction_up = SetVector(0.0f,1.0f,0.0f);
-    direction_forwards = VectorAdd(p_vector,ScalarMult(l_vector, -1));
-    direction_to_the_right = cross(direction_forwards, direction_up);
-
-    glUniformMatrix4fv(glGetUniformLocation(program, "projectionMatrix"), 1, GL_TRUE, projectionMatrix);
-
-    // initial camera matrix
-    cameraMatrix = lookAtv(p_vector, l_vector, v_vector);
-    glUniformMatrix4fv(glGetUniformLocation(program, "cameraMatrix"), 1, GL_TRUE, cameraMatrix.m);
-    glUniform3fv(glGetUniformLocation(program, "cameraPosition"), 1, &p_vector);
-
-    mouseDrag(prev_1_click.x, prev_1_click.y);
-
-    mat4 import_rot, import_trans, import_scale, importMatrix;
-    mat4 rot, trans, scale, transformationMatrix;
+    mat4 import_rot,import_trans,import_scale,importMatrix;
+    mat4 rot,trans,scale,transformationMatrix;
     char model_path[PATH_MAX];
     char tex_path[PATH_MAX];
     float texScale;
     _Bool isShaded;
-    int specExp;
+    GLfloat specExp;
 
-    trans = T(0.0f, 0.0f, 0.0f);
-    rot = Rx(0.0f);
-    scale = S(1.0f, 1.0f, 1.0f);
-    transformationMatrix = Mult(trans,Mult(rot, scale));
+    _Bool isActive;
+    vec3 colour;
+    GLfloat intensity;
+    _Bool isDirectional;
+    vec3 pos_dir;
+
+    vec3 corner_a,corner_b;
+
+    import_trans = T(0,0,0);
+    import_rot = Rx(0);
+    import_scale = S(MAP_SCALE*1.0f,MAP_SCALE*1.0f,MAP_SCALE*1.0f);
+    importMatrix = Mult(import_trans,Mult(import_rot,import_scale));
+    strcpy(model_path,"Data/Models/Lamp/lamp.obj");
+    strcpy(tex_path,"Data/Textures/No_texture/no_texture.tga");
+    texScale = 1;
+    isShaded = 1;
+    specExp = 100;
+
+    int isLight = 0;
+    struct light_data no_light;
 
     // init ground model
-    import_trans = T(0, 0, 0);
-    import_rot = Rx(0);
-    import_scale = S(dim_x, 1.0f, dim_y);
-    importMatrix = Mult(import_trans,Mult(import_rot, import_scale));
-    strcpy(model_path, "Data/Models/Plane/plane.obj");
-    strcpy(tex_path, "Data/Textures/No_texture/no_texture.tga");
-    texScale = dim_x;
+     import_trans = T(0,0,0);
+     import_rot = Rx(0);
+     import_scale = S(MAP_SCALE*MAP_DIM_X,MAP_SCALE*1.0f,MAP_SCALE*MAP_DIM_Y);
+     importMatrix = Mult(import_trans,Mult(import_rot,import_scale));
+     corner_a = SetVector(MAP_SCALE*MAP_DIM_X,0,MAP_SCALE*MAP_DIM_Y);
+     corner_b = SetVector(-MAP_SCALE*MAP_DIM_X,0-MAP_SCALE,-MAP_SCALE*MAP_DIM_Y);
+    strcpy(model_path,"Data/Models/Plane/plane.obj");
+    strcpy(tex_path,"Data/Textures/Floor/WoodFloor007.tga");
+     texScale = MAP_DIM_X;
     isShaded = 1;
-    specExp = specularExponent[0];
+    specExp = 100;
 
-    ground = init_model_data(ground,model_path,tex_path,importMatrix,
-                    transformationMatrix,texScale,isShaded,specExp);
+    ground = init_model_data(ground,model_path,tex_path,importMatrix,texScale,isShaded,specExp,isLight,no_light,corner_a,corner_b);
 
     // init wall models
-    int layout[dim_y][dim_x];
-    read_level_from_file(layout, "Data/Levels/Level_1/layout.txt");
-    place_walls(layout, walls);
+    int layout[MAP_DIM_Y][MAP_DIM_X];
+    read_level_from_file(layout,"Data/Levels/Level_1/layout.txt");
+    place_walls(layout,walls);
+    
+    
+
+    for (int i=0; i<4; ++i)
+    {
+        vec3 position = SetVector(MAP_SCALE*7*((i%2)*2-1),MAP_SCALE*1,MAP_SCALE*7*(((i*2)-3)/abs((i*2)-3)));
+        // init lamp model
+        import_trans = T(position.x,position.y,position.z);
+        import_rot = Rx(0);
+        import_scale = S(MAP_SCALE*0.3f,MAP_SCALE*0.3f,MAP_SCALE*0.3f);
+        importMatrix = Mult(import_trans,Mult(import_rot,import_scale));
+        corner_a = SetVector(position.x+MAP_SCALE*0.3f/2.0,position.y+MAP_SCALE*0.3f/2.0,position.z+MAP_SCALE*0.3f/2.0);
+        corner_b = SetVector(position.x-MAP_SCALE*0.3f/2.0,position.y-MAP_SCALE*0.3f/2.0,position.z-MAP_SCALE*0.3f/2.0);
+        strcpy(model_path,"Data/Models/Light_bulb/light_bulb.obj");
+        strcpy(tex_path,"Data/Textures/No_texture/no_texture.tga");
+        texScale = MAP_DIM_X;
+        isShaded = 0;
+        specExp = 100;
+        int isLight = 1;
+        struct light_data lamp_light;
+
+        // init lamp_light
+        isActive = 1;
+        colour = SetVector(1,1,1);
+        intensity = 3.0;
+        isDirectional = 0;
+        pos_dir = position;
+
+        lamp_light = init_light_data(lamp_light,isActive,colour,intensity,isDirectional,pos_dir);
+        lamps[i] = init_model_data(lamps[i],model_path,tex_path,importMatrix,texScale,isShaded,specExp,isLight,lamp_light,corner_a,corner_b);
+    }
+
+    projectionMatrix = frustum(left,right,bottom,top,near,far);
+    glUniformMatrix4fv(glGetUniformLocation(program,"projectionMatrix"),1,GL_TRUE,projectionMatrix.m);
 
     printError("init arrays");
 }
 
-void display(void)
-{
+void display(void) {
     printError("pre display");
-
-    glUniform3fv(glGetUniformLocation(program, "lightSourcesDirPosArr"), 4, &lightSourcesDirectionsPositions[0].x);
-    glUniform3fv(glGetUniformLocation(program, "lightSourcesColorArr"), 4, &lightSourcesColorsArr[0].x);
-    glUniform1iv(glGetUniformLocation(program, "isDirectional"), 4, isDirectional);
-
-    GLfloat t = (GLfloat)(glutGet(GLUT_ELAPSED_TIME));
-    GLfloat time;
 
     // clear the screen
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    mat4 import_rot, import_trans, import_scale, importMatrix;
-    mat4 rot, trans, scale, transformationMatrix;
-    mat4 modelMatrix;
-    GLfloat tx, ty, tz, sx, sy, sz, rx, ry, rz;
+    time = (GLfloat)glutGet(GLUT_ELAPSED_TIME)*0.001;
+    glUniform1f(glGetUniformLocation(program,"time"),time);
 
+    camera = update_camera_position(camera,user_input,walls,ground);
+    user_input = reset_user_input(user_input);
+    
+    
+    
+    
+    
     // display ground model
     load_model_data(ground);
-    DrawModel(ground.model, program, "in_Position", "in_Normal", "in_TexCoord");
+    DrawModel(ground.model,program,"in_Position","in_Normal","in_TexCoord");
+    for (int i=0; i<4; ++i)
+    {
+        load_model_data(lamps[i]);
+        DrawModel(lamps[i].model,program,"in_Position","in_Normal","in_TexCoord");
+    }
     // display wall models
-    for (int i=0; i<dim_x*dim_y; ++i)
+    for (int i=0; i<MAP_DIM_X*MAP_DIM_Y; ++i)
     {
         if (walls[i].textureId > 0)
         {
             load_model_data(walls[i]);
-            DrawModel(walls[i].model, program, "in_Position", "in_Normal", "in_TexCoord");
+            DrawModel(walls[i].model,program,"in_Position","in_Normal","in_TexCoord");
         }
     }
-    keyPress();
-
-    printError("display");
+    
+    
+    
+    display_lights();
+    
+    
+    
+    
 
     glutSwapBuffers();
 }
 
-int main(int argc, char *argv[])
+void OnTimer(int value)
 {
-    glutInit(&argc, argv);
+    glutPostRedisplay();
+    glutTimerFunc(20,&OnTimer,value);
+    user_input = keyboard_func(user_input);
+}
+
+int main(int argc,char *argv[])
+{
+    glutInit(&argc,argv);
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
-    glutInitContextVersion(3, 2);
+    glutInitContextVersion(3,2);
+    glutInitWindowSize(800,800);
     glutCreateWindow ("computer graphics project");
     glutDisplayFunc(display);
-    //glutPassiveMotionFunc(mouseHover);
-    glutMotionFunc(mouseDrag);
-    glutMouseFunc(mouseClick);
+    glutPassiveMotionFunc(&mouse_func);
     init ();
     // Timer
-    glutTimerFunc(20, &OnTimer, 0);
+    glutTimerFunc(20,&OnTimer,0);
     glutMainLoop();
     return 0;
 }

@@ -3,27 +3,14 @@
 
     #include <essentials.h>
 
-    float max(float a, float b);
-    float min(float a, float b);
+    struct user_input_data
+    {
+        vec3 movement;
+        vec3 rotation;
+    };
 
-    // initial camera matrix
-    vec3 init_p_vector;
-    vec3 init_l_vector;
-    vec3 init_v_vector;
-    vec3 p_vector;
-    vec3 l_vector;
-    vec3 v_vector;
-    mat4 cameraMatrix;
+    struct user_input_data keyboard_func(struct user_input_data user_input);
 
-    GLfloat x_diff;
-    GLfloat y_diff;
-
-    vec3 direction_forwards, direction_up, direction_to_the_right;
-    vec2 prev_1_click, prev_2_click;
-    _Bool clicked_previously;
-
-    void keyPress();
-    void mouseDrag(int x, int y);
-    void mouseClick(int button, int state, int x, int y);
+    void mouse_func(int x,int y);
 
 #endif
