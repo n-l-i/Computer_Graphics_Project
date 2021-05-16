@@ -13,7 +13,7 @@ uniform bool isShaded;
 uniform float specularExponent;
 uniform vec3 cameraPosition;
 
-#define MAX_LIGHTS 4
+#define MAX_LIGHTS 20
 uniform bool isActive[MAX_LIGHTS];
 uniform vec3 lightSourcesDirPosArr[MAX_LIGHTS];
 uniform vec3 lightSourcesColorArr[MAX_LIGHTS];
@@ -45,15 +45,15 @@ void main(void)
             } else {
                 vec3 light_position = lightSourcesDirPosArr[i];
                 light_direction = normalize(vertexPosition - light_position);
-                light_distance = max(0,length(vertexPosition - light_position))/4;
+                light_distance = max(0,length(vertexPosition - light_position))/2;
             }
 
             // Diffuse light component
-            light_diffuse += light_intensity * max(0, -dot(normal, light_direction)) * light_colour * pow(1/light_distance,2);
+            light_diffuse += light_intensity * max(0, -dot(normal, light_direction)) * light_colour * pow(1/light_distance,1.5);
             // Specular light component
             vec3 reflection = reflect(light_direction, normal);
             vec3 eyeDirection = normalize(cameraPosition - vertexPosition);
-            light_specular += light_intensity * pow(max(0.1, dot(reflection,eyeDirection)), specularExponent) * light_colour/max(1,300/specularExponent);
+            light_specular += light_intensity * pow(max(0.1, dot(reflection,eyeDirection)), specularExponent) * light_colour/max(1,300/specularExponent)/2;
         }
     }
 
