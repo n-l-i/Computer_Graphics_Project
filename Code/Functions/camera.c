@@ -4,7 +4,7 @@
 
 struct camera_data init_camera(struct camera_data camera)
 {
-    camera.position = SetVector(MAP_SCALE*(-7),MAP_SCALE*1,MAP_SCALE*7);
+    camera.position = SetVector(MAP_SCALE*(-7),MAP_SCALE*1,MAP_SCALE*8);
     camera.target = SetVector(MAP_SCALE*(-7),MAP_SCALE*1,MAP_SCALE*(-7));
     camera.up = SetVector(0,1,0);
 
