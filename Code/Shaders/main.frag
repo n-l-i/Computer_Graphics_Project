@@ -1,89 +1,63 @@
 #version 150
 
 in  vec3 normal;
-in vec3 vertexPosition;
+in  vec3 vertexPosition;
 in  vec2 texCoord;
+
 out vec4 out_Color;
 
-uniform vec3 cameraPosition;
-
 uniform sampler2D texUnit;
-uniform mat4 time;
+uniform float time;
 uniform float textureRepeats;
 uniform bool isShaded;
-
-uniform vec3 lightSourcesDirPosArr[4];
-uniform vec3 lightSourcesColorArr[4];
 uniform float specularExponent;
-uniform bool isDirectional[4];
+uniform vec3 cameraPosition;
 
-// ambient light
-vec3 ambientLight(vec3 lightColour, float lightIntensity)
-{
-    lightColour = normalize(lightColour)*3;
-    return lightColour*lightIntensity;
-}
+#define MAX_LIGHTS 4
+uniform bool isActive[MAX_LIGHTS];
+uniform vec3 lightSourcesDirPosArr[MAX_LIGHTS];
+uniform vec3 lightSourcesColorArr[MAX_LIGHTS];
+uniform float lightIntensity[MAX_LIGHTS];
+uniform float ambientFactor[MAX_LIGHTS];
+uniform bool isDirectional[MAX_LIGHTS];
 
-// diffuse phong light
-vec3 diffuseLight(vec3 lightColour, float lightIntensity, vec3 lightPosition, vec3 vertexPosition, vec3 normal)
-{
-    lightColour = normalize(lightColour)*3;
-    vec3 lightDirection = normalize(lightPosition - vertexPosition);
-    float lightStrength = max(dot(normal, lightDirection), 0.0);
-    return lightStrength*lightColour*lightIntensity;
-}
 
-// specular phong light
-vec3 specularLight(vec3 lightColour, float lightIntensity, vec3 lightPosition, vec3 vertexPosition, vec3 normal, vec3 cameraPosition, float exponent)
-{
-    lightColour = normalize(lightColour)*3;
-    vec3 lightDirection = normalize(lightPosition - vertexPosition);
-    vec3 reflectedLightDirection = reflect(-lightDirection, normal);
-    vec3 eyeDirection = normalize(cameraPosition - vertexPosition);
-    float lightStrength = 0.0;
-    if (dot(lightDirection, normal) > 0.0)
-    {
-        lightStrength = max(dot(reflectedLightDirection, eyeDirection), 0.01);
-        lightStrength = pow(lightStrength, exponent);
-    }
-    return lightStrength*lightColour*lightIntensity;
-}
-
-// diffuse directional light
-vec3 directionalLight(vec3 lightColour, vec3 lightDirection, vec3 normal, float lightIntensity)
-{
-    lightColour = normalize(lightColour)*3;
-    float lightStrength = max(dot(normal, lightDirection), 0.0);
-    return lightStrength*lightColour*lightIntensity;
-}
 
 void main(void)
 {
+    vec4 texturePattern = texture(texUnit, texCoord * textureRepeats);
 
-    vec3 light = vec3(0.0, 0.0, 0.0);
 
-    float lightIntensity = 1.0;
-    int n = lightSourcesColorArr.length();
-    for(int i = 0; i < n; i++)
-    {
-        vec3 lightColour = lightSourcesColorArr[i];
+    vec3 light_ambient = vec3(0.1, 0.1, 0.1);
+    vec3 light_diffuse = vec3(0.0, 0.0, 0.0);
+    vec3 light_specular = vec3(0.0, 0.0, 0.0);
 
-        if(isDirectional[i])
-        {
-            vec3 lightDirection = lightSourcesDirPosArr[i];
-            vec3 directionalLight = directionalLight(lightColour, lightDirection, normal, lightIntensity);
-            light += directionalLight / n;
-        }
-        else
-        {
-            vec3 lightPosition = lightSourcesDirPosArr[i];
-            vec3 diffuseLight = diffuseLight(lightColour, lightIntensity, lightPosition, vertexPosition, normal);
-            vec3 specularLight = specularLight(lightColour, lightIntensity, lightPosition, vertexPosition, normal, cameraPosition, specularExponent);
-            light += (diffuseLight + specularLight) / n;
+    for (int i=0; i<MAX_LIGHTS; i++) {
+        if (isActive[i]) {
+            vec3 light_colour = lightSourcesColorArr[i];
+            float light_intensity = lightIntensity[i];
+            vec3 light_direction;
+            float light_distance;
+
+            if (isDirectional[i]) {
+                light_direction = normalize(lightSourcesDirPosArr[i]);
+                light_distance = 0.1;
+            } else {
+                vec3 light_position = lightSourcesDirPosArr[i];
+                light_direction = normalize(vertexPosition - light_position);
+                light_distance = max(0,length(vertexPosition - light_position))/4;
+            }
+
+            // Diffuse light component
+            light_diffuse += light_intensity * max(0, -dot(normal, light_direction)) * light_colour * pow(1/light_distance,2);
+            // Specular light component
+            vec3 reflection = reflect(light_direction, normal);
+            vec3 eyeDirection = normalize(cameraPosition - vertexPosition);
+            light_specular += light_intensity * pow(max(0.1, dot(reflection,eyeDirection)), specularExponent) * light_colour/max(1,300/specularExponent);
         }
     }
 
-    vec4 texturePattern = texture(texUnit, texCoord * textureRepeats);
+    vec3 light = light_ambient + light_diffuse + light_specular;
 
     if(isShaded)
     {

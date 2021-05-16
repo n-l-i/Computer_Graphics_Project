@@ -8,7 +8,9 @@ CC = gcc
 CFLAGS = -Wall -lXt -lX11 -lGL -lm
 
 MAIN_FILE = $(main_dir)main.c
-FUNCTIONS = $(functions_dir)map_functions.c $(functions_dir)user_input.c $(functions_dir)model_data_functions.c
+
+FUNCTIONS = $(functions_dir)map_functions.c $(functions_dir)user_input.c $(functions_dir)model_functions.c $(functions_dir)camera.c $(functions_dir)misc_functions.c
+
 EXTERNAL_LIBS = $(external_libs_dir)GL_utilities.c $(external_libs_dir)VectorUtils3.c $(external_libs_dir)LittleOBJLoader.c $(external_libs_dir)LoadTGA.c $(external_libs_dir)MicroGlut.c
 
 all : get_external_libs main

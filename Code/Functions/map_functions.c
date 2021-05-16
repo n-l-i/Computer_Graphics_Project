@@ -1,9 +1,9 @@
 #include "map_functions.h"
 
-void read_level_from_file(int layout[dim_y][dim_x], char filepath[])
+void read_level_from_file(int layout[MAP_DIM_Y][MAP_DIM_X], char filepath[])
 {
-    int rows = dim_y;
-    int cols = dim_x;
+    int rows = MAP_DIM_Y;
+    int cols = MAP_DIM_X;
     int row=0;
     int col=0;
     char file_path[PATH_MAX];
@@ -33,28 +33,26 @@ void read_level_from_file(int layout[dim_y][dim_x], char filepath[])
     }
 }
 
-void place_walls(int layout[dim_y][dim_x], struct model_data walls[dim_x*dim_y])
+void place_walls(int layout[MAP_DIM_Y][MAP_DIM_X], struct model_data walls[MAP_DIM_X*MAP_DIM_Y])
 {
     mat4 import_rot, import_trans, import_scale, importMatrix;
-    mat4 rot, trans, scale, transformationMatrix;
-    trans = T(0.0f, 0.0f, 0.0f);
-    rot = Rx(0.0f);
-    scale = S(1.0f, 1.0f, 1.0f);
-    transformationMatrix = Mult(trans,Mult(rot, scale));
     char model_path[PATH_MAX];
     char tex_path[PATH_MAX];
 
     // init wall models
     strcpy(model_path, "Data/Models/Wall/wall.obj");
-    strcpy(tex_path, "Data/Textures/No_texture/no_texture.tga");
-    int texScale = 50;
+    strcpy(tex_path, "Data/Textures/Wall/Plaster004.tga");
+    int texScale = 5;
     int isShaded = 1;
-    int specExp = 0;
+    int specExp = 1;
 
-    int rows = dim_y;
-    int cols = dim_x;
+    int rows = MAP_DIM_Y;
+    int cols = MAP_DIM_X;
     int wall_index = 0;
-    import_scale = S(1.0f, 1.0f, 1.0f);
+    import_scale = S(MAP_SCALE*1.0f, MAP_SCALE*1.0f, MAP_SCALE*1.0f);
+
+    int isLight = 0;
+    struct light_data no_light;
 
     // placing all walls marked in the layout file
     for (int row = 0; row < rows; ++row)
@@ -64,15 +62,42 @@ void place_walls(int layout[dim_y][dim_x], struct model_data walls[dim_x*dim_y])
             int val = layout[col][row];
             if (val > 0)
             {
-                if (val == 1) { import_trans = T(2*(col+0)-(cols), 0, 2*(row+0)-(rows)); }
-                if (val == 2) { import_trans = T(2*(col+1)-(cols), 0, 2*(row+0)-(rows)); }
-                if (val == 3) { import_trans = T(2*(col+1)-(cols), 0, 2*(row+1)-(rows)); }
-                if (val == 4) { import_trans = T(2*(col+0)-(cols), 0, 2*(row+1)-(rows)); }
-                import_rot = Ry((val*0.75f)*M_PI*2);
+                vec3 corner_a,corner_b;
+                vec3 position;
+                if (val == 1)
+                {
+                    position = SetVector(MAP_SCALE*2*(col+0)-MAP_SCALE*(cols), 0, MAP_SCALE*2*(row+0)-MAP_SCALE*(rows));
+                    import_trans = T(position.x,position.y,position.z);
+                }
+                if (val == 2)
+                {
+                    position = SetVector(MAP_SCALE*2*(col+1)-MAP_SCALE*(cols), 0, MAP_SCALE*2*(row+0)-MAP_SCALE*(rows));
+                    import_trans = T(position.x,position.y,position.z);
+                }
+                if (val == 3)
+                {
+                    position = SetVector(MAP_SCALE*2*(col+1)-MAP_SCALE*(cols), 0, MAP_SCALE*2*(row+1)-MAP_SCALE*(rows));
+                    import_trans = T(position.x,position.y,position.z);
+                }
+                if (val == 4)
+                {
+                    position = SetVector(MAP_SCALE*2*(col+0)-MAP_SCALE*(cols), 0, MAP_SCALE*2*(row+1)-MAP_SCALE*(rows));
+                    import_trans = T(position.x,position.y,position.z);
+                }
+
+                GLfloat rotation = (val*0.75f)*M_PI*2;
+                import_rot = Ry(rotation);
                 importMatrix = Mult(import_trans,Mult(import_rot, import_scale));
 
-                walls[wall_index] = init_model_data(walls[wall_index],model_path,tex_path,importMatrix,
-                transformationMatrix,texScale,isShaded,specExp);
+                corner_a = SetVector(position.x,position.y,position.z);
+                if (val == 4) { corner_b = SetVector(position.x+2*MAP_SCALE,position.y+2*MAP_SCALE,position.z-0.5*MAP_SCALE); }
+                if (val == 1) { corner_b = SetVector(position.x+0.5*MAP_SCALE,position.y+2*MAP_SCALE,position.z+2*MAP_SCALE); }
+                if (val == 2) { corner_b = SetVector(position.x-2*MAP_SCALE,position.y+2*MAP_SCALE,position.z+0.5*MAP_SCALE); }
+                if (val == 3) { corner_b = SetVector(position.x-0.5*MAP_SCALE,position.y+2*MAP_SCALE,position.z-2*MAP_SCALE); }
+
+                walls[wall_index] = init_model_data(walls[wall_index],
+                                    model_path,tex_path,importMatrix,texScale,
+                                    isShaded,specExp,isLight,no_light,corner_a,corner_b);
 
                 wall_index++;
             }
@@ -101,15 +126,40 @@ void place_walls(int layout[dim_y][dim_x], struct model_data walls[dim_x*dim_y])
 
                 if (make_corner)
                 {
-                    if (neighbour_behind_val == 1) { import_trans = T(2*(col+0)-(cols), 0, 2*(row+0)-(rows)); }
-                    if (neighbour_behind_val == 2) { import_trans = T(2*(col+1)-(cols), 0, 2*(row+0)-(rows)); }
-                    if (neighbour_behind_val == 3) { import_trans = T(2*(col+1)-(cols), 0, 2*(row+1)-(rows)); }
-                    if (neighbour_behind_val == 4) { import_trans = T(2*(col+0)-(cols), 0, 2*(row+1)-(rows)); }
-                    import_rot = Ry((neighbour_behind_val*0.75f)*M_PI*2);
+                    vec3 corner_a,corner_b;
+                    vec3 position;
+
+                    if (neighbour_behind_val == 1)
+                    {
+                        position = SetVector(MAP_SCALE*2*(col+0)-MAP_SCALE*(cols), 0, MAP_SCALE*2*(row+0)-MAP_SCALE*(rows));
+                        import_trans = T(position.x,position.y,position.z);
+                    }
+                    if (neighbour_behind_val == 2)
+                    {
+                        position = SetVector(MAP_SCALE*2*(col+1)-MAP_SCALE*(cols), 0, MAP_SCALE*2*(row+0)-MAP_SCALE*(rows));
+                        import_trans = T(position.x,position.y,position.z);
+                    }
+                    if (neighbour_behind_val == 3) {
+                        position = SetVector(MAP_SCALE*2*(col+1)-MAP_SCALE*(cols), 0, MAP_SCALE*2*(row+1)-MAP_SCALE*(rows));
+                        import_trans = T(position.x,position.y,position.z);
+                    }
+                    if (neighbour_behind_val == 4) {
+                        position = SetVector(MAP_SCALE*2*(col+0)-MAP_SCALE*(cols), 0, MAP_SCALE*2*(row+1)-MAP_SCALE*(rows));
+                        import_trans = T(position.x,position.y,position.z);
+                    }
+                    GLfloat rotation = (neighbour_behind_val*0.75f)*M_PI*2;
+                    import_rot = Ry(rotation);
                     importMatrix = Mult(import_trans,Mult(import_rot, import_scale));
 
-                    walls[wall_index] = init_model_data(walls[wall_index],model_path,tex_path,importMatrix,
-                    transformationMatrix,texScale,isShaded,specExp);
+                    corner_a = SetVector(position.x,position.y,position.z);
+                    if (neighbour_behind_val == 4) { corner_b = SetVector(position.x+2*MAP_SCALE,position.y+2*MAP_SCALE,position.z-0.5*MAP_SCALE); }
+                    if (neighbour_behind_val == 1) { corner_b = SetVector(position.x+0.5*MAP_SCALE,position.y+2*MAP_SCALE,position.z+2*MAP_SCALE); }
+                    if (neighbour_behind_val == 2) { corner_b = SetVector(position.x-2*MAP_SCALE,position.y+2*MAP_SCALE,position.z+0.5*MAP_SCALE); }
+                    if (neighbour_behind_val == 3) { corner_b = SetVector(position.x-0.5*MAP_SCALE,position.y+2*MAP_SCALE,position.z-2*MAP_SCALE); }
+
+                    walls[wall_index] = init_model_data(walls[wall_index],
+                                        model_path,tex_path,importMatrix,
+                                        texScale,isShaded,specExp,isLight,no_light,corner_a,corner_b);
 
                     wall_index++;
                 }
