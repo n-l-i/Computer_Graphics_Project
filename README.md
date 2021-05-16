@@ -14,4 +14,5 @@ The project currently only runs on Linux.
 
 ## Note
 
-This project also uses some external libraries provided by [Ingemar Ragnemalm](ingemar@ragnemalm.se).
+This project contains assets from [CC0Textures.com](https://cc0textures.com/) licensed under CC0 1.0 Universal,
+and also uses external libraries provided by [Ingemar Ragnemalm](ingemar@ragnemalm.se).
