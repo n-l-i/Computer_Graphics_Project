@@ -33,9 +33,11 @@ void main(void)
     vec3 light_specular = vec3(0.0, 0.0, 0.0);
 
     for (int i=0; i<MAX_LIGHTS; i++) {
-        if (isActive[i]) {
+        if (isActive[i] && int(time+i*3)%61 != 0 && int(time+i*7)%81 != 0) {
             vec3 light_colour = lightSourcesColorArr[i];
             float light_intensity = lightIntensity[i];
+            if (int(time+i*13)%5 == 0) { light_intensity = light_intensity/1.1; }
+            if (int(time/10.0+i*7)%5 == 0 || int(time/10.0+i*7)%5 == 1) { light_intensity = light_intensity/1.5; }
             vec3 light_direction;
             float light_distance;
 
@@ -54,6 +56,7 @@ void main(void)
             vec3 reflection = reflect(light_direction, normal);
             vec3 eyeDirection = normalize(cameraPosition - vertexPosition);
             light_specular += light_intensity * pow(max(0.1, dot(reflection,eyeDirection)), specularExponent) * light_colour/max(1,300/specularExponent)/2;
+
         }
     }
 
