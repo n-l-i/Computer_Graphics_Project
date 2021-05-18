@@ -35,7 +35,6 @@ void init(void) {
 
     camera = init_camera(camera);
     user_input = reset_user_input(user_input);
-//     init_lights();
 
     mat4 import_rot,import_trans,import_scale,importMatrix;
     mat4 rot,trans,scale,transformationMatrix;
@@ -169,7 +168,7 @@ void display(void) {
     // clear the screen
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    time = (GLfloat)glutGet(GLUT_ELAPSED_TIME)*0.001;
+    time = (GLfloat)glutGet(GLUT_ELAPSED_TIME)*0.01;
     glUniform1f(glGetUniformLocation(program,"time"),time);
 
 
@@ -225,7 +224,7 @@ int main(int argc,char *argv[])
     glutInit(&argc,argv);
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
     glutInitContextVersion(3,2);
-    glutInitWindowSize(600,600);
+    glutInitWindowSize(900,900);
     glutCreateWindow ("computer graphics project");
     glutDisplayFunc(display);
     glutPassiveMotionFunc(&mouse_func);
