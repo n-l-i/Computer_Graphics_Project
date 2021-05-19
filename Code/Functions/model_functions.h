@@ -4,7 +4,7 @@
     #include <essentials.h>
 
     struct light_data {
-        _Bool isActive;
+        _Bool is_active_light;
         vec3 colour;
         GLfloat intensity;
         _Bool isDirectional;
@@ -29,7 +29,7 @@
                      char rel_tex_path[], mat4 modelMatrix, float textureScale,
                      _Bool isShaded,float specularExponent, _Bool isLight, struct light_data light, vec3 corner_a, vec3 corner_b);
 
-    struct light_data init_light_data(struct light_data light,_Bool isActive,
+    struct light_data init_light_data(struct light_data light,_Bool is_active_light,
                         vec3 colour,GLfloat intensity,_Bool isDirectional,vec3 pos_dir);
 
     void load_model_data(struct model_data model);
