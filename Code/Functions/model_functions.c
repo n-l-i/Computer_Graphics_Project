@@ -27,10 +27,10 @@ struct model_data init_model_data(struct model_data model, char rel_model_path[]
 }
 
 
-struct light_data init_light_data(struct light_data light,_Bool isActive,
+struct light_data init_light_data(struct light_data light,_Bool is_active_light,
                     vec3 colour,GLfloat intensity,_Bool isDirectional,vec3 pos_dir)
 {
-    light.isActive = isActive;
+    light.is_active_light = is_active_light;
     light.colour = colour;
     light.intensity = intensity;
     light.isDirectional = isDirectional;
@@ -54,7 +54,7 @@ void load_model_data(struct model_data model)
     }
 }
 
-GLint isActive[MAX_LIGHTS];
+GLint is_active_light[MAX_LIGHTS];
 GLfloat lightSourcesColorsArr[MAX_LIGHTS*3];
 GLfloat lightIntensity[MAX_LIGHTS];
 GLint isDirectional[MAX_LIGHTS];
@@ -62,12 +62,12 @@ GLfloat lightSourcesDirectionsPositions[MAX_LIGHTS*3];
 
 void load_light(struct light_data light)
 {
-    if (!light.isActive) { return; }
+    if (!light.is_active_light) { return; }
 
     for (int i=0; i<MAX_LIGHTS; i++)
     {
-        if (!isActive[i]){
-            isActive[i] = light.isActive;
+        if (!is_active_light[i]){
+            is_active_light[i] = light.is_active_light;
             lightIntensity[i] = light.intensity;
             isDirectional[i] = light.isDirectional;
 
@@ -88,7 +88,7 @@ void load_light(struct light_data light)
 
 void display_lights()
 {
-    glUniform1iv(glGetUniformLocation(program, "isActive"), MAX_LIGHTS, isActive);
+    glUniform1iv(glGetUniformLocation(program, "is_active_light"), MAX_LIGHTS, is_active_light);
     glUniform3fv(glGetUniformLocation(program, "lightSourcesDirPosArr"), MAX_LIGHTS, lightSourcesDirectionsPositions);
     glUniform3fv(glGetUniformLocation(program, "lightSourcesColorArr"), MAX_LIGHTS, lightSourcesColorsArr);
     glUniform1fv(glGetUniformLocation(program, "lightIntensity"), MAX_LIGHTS, lightIntensity);
@@ -96,6 +96,6 @@ void display_lights()
 
     for (int i=0; i<MAX_LIGHTS; i++)
     {
-        isActive[i] = 0;
+        is_active_light[i] = 0;
     }
 }
