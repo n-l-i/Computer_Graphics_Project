@@ -10,7 +10,7 @@ Here are the commands to run the project:
 * to compile the project: `(cd <project path> && make)`
 * to run the compiled file: `(cd <project path> && ./3D_project.out)`
 
-The project currently only runs on Linux.
+The project is written for Linux and as such might need adjustments to get it working on other platforms.
 
 ## Note
 
